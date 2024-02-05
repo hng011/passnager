@@ -5,7 +5,7 @@ import art
 from random import randint
 from dotenv import load_dotenv
 from tabulate import tabulate
-from passnager_modules.PassCrypt import pass_encrypt, pass_decrypt
+from passnager_modules.PassCrypt import pass_encrypt, pass_decrypt, generate_secret_key
 
 # load .env
 load_dotenv(dotenv_path="./.env")
@@ -41,7 +41,7 @@ class Passnager:
             print(len(self.__data[1:]), "data found")
             decrypted_data = []
             for x in self.__data[1:]:
-                decrypted_data.append([x[0], x[1], self.__decrypt_pass(x[3])])
+                decrypted_data.append([x[0], x[1], x[2], self.__decrypt_pass(x[3])])
 
             return tabulate(decrypted_data, headers=self.__data[0], tablefmt=table_fmt)
         except:
@@ -58,7 +58,6 @@ class Passnager:
     def __add_list_data(self) -> tuple:
         if len(self.__data) > 1:
             list_id = [x[0] for x in self.__data[1:]]
-            print(list_id)
             while True:
                 id = self.__generate_id()
                 if id not in list_id: 
@@ -112,8 +111,7 @@ class Passnager:
         ...
 
 def generate_key():
-    from cryptography.fernet import Fernet
-    key = Fernet.generate_key().decode()
+    key = generate_secret_key()
 
     try:
         with open(".env", "w") as f:
