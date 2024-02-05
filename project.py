@@ -2,14 +2,19 @@ import os
 import sys
 import csv
 import art
+from random import randint
 from dotenv import load_dotenv
 from tabulate import tabulate
 from passnager_modules.PassCrypt import pass_encrypt, pass_decrypt
 
+# load .env
+load_dotenv(dotenv_path="./.env")
+
 class Passnager:
-    def __init__(self, file_name: str="data.csv"):
+    def __init__(self, secret_key, file_name="data.csv"):
         self.__data = []
         self.__file_name = file_name
+        self.__secret_key = secret_key
         # Open file
         while True:
             try:
@@ -19,43 +24,77 @@ class Passnager:
                     break
             except FileNotFoundError:
                 print(f"Create {self.__file_name} file")
-                headers: list = ["no", "username_or_email", "password"]
+                headers: list = ["id", "app", "username_or_email", "password"]
                 with open("./data.csv", "w") as f:
                     writer = csv.DictWriter(f, fieldnames=headers)
                     writer.writeheader()
-                    # writer.writerows(dummy)
                 continue
 
+    def __encrypt_pass(self, plain_pwd=None):
+        return pass_encrypt(plain_pwd, self.__secret_key)
+
+    def __decrypt_pass(self, encrypted_pwd=None):
+        return pass_decrypt(encrypted_pwd, self.__secret_key)
+
     def show_data(self, table_fmt="fancy_grid") -> tabulate:
-        try:
-            if not self.__data:
-                return "0 Data Found"
-            
+        try:            
             print(len(self.__data[1:]), "data found")
-            return tabulate(self.__data[1:], headers=self.__data[0], tablefmt=table_fmt)
+            decrypted_data = []
+            for x in self.__data[1:]:
+                decrypted_data.append([x[0], x[1], self.__decrypt_pass(x[3])])
+
+            return tabulate(decrypted_data, headers=self.__data[0], tablefmt=table_fmt)
         except:
             return "Something went wrong while trying to read a csv file"
 
+    def __generate_id(val_len=4) -> str:
+        id = ""
+        while True:
+            if len(id) == 4:
+                break
+            id += str(randint(0,9))
+        return id
+
     def __add_list_data(self) -> tuple:
         if len(self.__data) > 1:
-            no = int(self.__data[-1][0]) + 1
+            list_id = [x[0] for x in self.__data[1:]]
+            print(list_id)
+            while True:
+                id = self.__generate_id()
+                if id not in list_id: 
+                    break
         else:
-            no = 1
-        username = input("\nUsername/email\t: ")
-        password = input("Password\t: ")
-        return (no, username, password)
+            id = self.__generate_id()
+
+        while True:
+            app = input("\nApp\t\t: ")
+            username = input("Username/email\t: ")
+            password = input("Password\t: ")
+
+            encr_password = self.__encrypt_pass(password)
+
+            if app and username and encr_password:
+                return (id, app, username, encr_password)
+            else:
+                print("Each field required!!!")
+
 
     def add_data(self) -> None:
         try:
             new_data = self.__add_list_data()
             if len(self.__data) > 1:
-                list_username = [x[1] for x in self.__data[1:]]
+                list_app = [x[1] for x in self.__data[1:]]
+                list_username = [x[2] for x in self.__data[1:]]
             else:
+                list_app = []
                 list_username = []
 
             with open(self.__file_name, "a") as f:
                 # Abort when the username is already exists
-                if new_data[1] in list_username:
+                if (
+                    new_data[1] in list_app and
+                    new_data[2] in list_username
+                ):
                     print("\nData already exists!!!\n")
                 else:
                     writer = csv.writer(f)
@@ -72,16 +111,28 @@ class Passnager:
     def delete_data(self):
         ...
 
+def generate_key():
+    from cryptography.fernet import Fernet
+    key = Fernet.generate_key().decode()
+
+    try:
+        with open(".env", "w") as f:
+            f.write(f"SECRET_KEY={key}")
+    except Exception as e:
+        sys.exit(e)
+
+    sys.exit("Succesfully generating a secret key")
+
 def get_dotenv() -> dict:
-    # load .env
-    load_dotenv(dotenv_path="./.env")
-    
+    if os.environ["SECRET_KEY"] == "":
+        sys.exit("KEY NOT FOUND: Run python project.py --generate-key")
+
     envs = {}
     try:
-        envs["app_name"] = os.environ["APP_NAME"]
         envs["secret_key"] = os.environ["SECRET_KEY"]
     except Exception as e:
         sys.exit(e)
+    
     return envs
 
 def clear_screen():
@@ -92,33 +143,41 @@ def clear_screen():
 
 def back_to_menu():
     while True:
-        if input("0 for back\t: ") == "0":
-            clear_screen()
+        if not(input("0 for back\t: ") == "0"): continue    
         break
+
+    clear_screen()
     
 def main():
-    clear_screen()
-    pm = Passnager()
+    if len(sys.argv) > 1 and sys.argv[1] == "--generate-key" and os.environ["SECRET_KEY"] == "":
+        generate_key()
+
+    envs = get_dotenv()
+    pm = Passnager(secret_key=envs["secret_key"])
+
     print("""
-====================================
-      | WELCOME TO PASSNAGER | 
-++==+++==+++==+++==+++==+++==+++==++
-    [1] show data
-    [2] add data       
-    [0] Exit       
-====================================""")
+    ====================================
+          | WELCOME TO PASSNAGER | 
+    ++==+++==+++==+++==+++==+++==+++==++
+        [1] show data
+        [2] add data       
+        [0] Exit       
+    ====================================""")
 
     display = """
-====================================         
-         |   PASSNAGER   |
-++==+++==+++==+++==+++==+++==+++==++
-    [1] show data
-    [2] add data       
-    [0] Exit       
-===================================="""
+    ====================================         
+             |   PASSNAGER   |
+    ++==+++==+++==+++==+++==+++==+++==++
+        [1] show data
+        [2] add data       
+        [0] Exit       
+    ===================================="""
 
     while True:
-        choice = input("[*] Menu Choice: ")
+        try:
+            choice = input("[*] Menu Choice: ")
+        except EOFError:
+            choice = "0"
         print()
         match choice:
             case "1":
@@ -134,6 +193,8 @@ def main():
                 sys.exit()
             case _:
                 print("Invalid Input!!!\n")
+                input("Press anything")
+                clear_screen()
                 continue
 
         print(display)
