@@ -30,13 +30,13 @@ class Passnager:
                     writer.writeheader()
                 continue
 
-    def __encrypt_pass(self, plain_pwd=None):
+    def encrypt_pass(self, plain_pwd=None):
         return pass_encrypt(plain_pwd, self.__secret_key)
 
-    def __decrypt_pass(self, encrypted_pwd=None):
+    def decrypt_pass(self, encrypted_pwd=None):
         return pass_decrypt(encrypted_pwd, self.__secret_key)
 
-    def __sort_data(self, data: list) -> list:
+    def sort_data(self, data: list) -> list:
         return sorted(data, key=lambda x: x[1])
 
     def show_data(self, *data, table_fmt="fancy_grid") -> tabulate:
@@ -52,9 +52,9 @@ class Passnager:
             decrypted_data = []
 
             for x in df[1:]:
-                decrypted_data.append([x[0], x[1], x[2], self.__decrypt_pass(x[3])])
+                decrypted_data.append([x[0], x[1], x[2], self.decrypt_pass(x[3])])
 
-            return tabulate(self.__sort_data(decrypted_data), headers=df[0], tablefmt=table_fmt)
+            return tabulate(self.sort_data(decrypted_data), headers=df[0], tablefmt=table_fmt)
         except Exception as e:
             return f"Something went wrong while trying to read the csv file\n{e}"
 
@@ -81,7 +81,7 @@ class Passnager:
             username = input("Username/email\t: ")
             password = input("Password\t: ")
 
-            encr_password = self.__encrypt_pass(password)
+            encr_password = self.encrypt_pass(password)
 
             if app and username and encr_password:
                 return (id, app, username, encr_password)
@@ -136,7 +136,7 @@ class Passnager:
         else:
             print(self.show_data(temp_data))
             while True:
-                id = input("Type one id to be deleted (0 for back): ")
+                id = input("Select one id to be deleted (0 for back): ")
                 if id == "0": 
                     break
                 else:
@@ -185,7 +185,6 @@ def generate_key():
 def get_dotenv() -> dict:
     if os.environ["SECRET_KEY"] == "":
         sys.exit("KEY NOT FOUND: Run python project.py --generate-key")
-
     envs = {}
     try:
         envs["secret_key"] = os.environ["SECRET_KEY"]
@@ -194,27 +193,23 @@ def get_dotenv() -> dict:
     
     return envs
 
-def clear_screen():
-    if os.name == "nt":
-        os.system("cls") 
+def clear_screen(osname=os.name):
+    if osname == "nt":
+        return "cls" 
     else:
-        os.system("clear")
+        return "clear"
 
 def back_to_menu():
     while True:
         if not(input("0 for back\t: ") == "0"): continue    
         break
-    clear_screen()
-    
-def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "--generate-key" and os.environ["SECRET_KEY"] == "":
-        generate_key()
+    os.system(clear_screen())
 
-    envs = get_dotenv()
-    clear_screen()
-    pm = Passnager(secret_key=envs["secret_key"])
+def get_ascii_art(text, font="banner3-D"):
+    return pyfiglet.figlet_format(text,font=font)
 
-    print("""
+def get_welcome_display():
+    return """
     ====================================
           | WELCOME TO PASSNAGER | 
     ++==+++==+++==+++==+++==+++==+++==++
@@ -222,9 +217,10 @@ def main():
         [2] add data       
         [3] delete data       
         [0] Exit       
-    ====================================""")
+    ===================================="""
 
-    display = """
+def get_display():
+    return """
     ====================================         
              |   PASSNAGER   |
     ++==+++==+++==+++==+++==+++==+++==++
@@ -233,6 +229,19 @@ def main():
         [3] delete data       
         [0] Exit       
     ===================================="""
+    
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--generate-key" and os.environ["SECRET_KEY"] == "":
+        generate_key()
+
+    envs = get_dotenv()
+    os.system(clear_screen())
+    pm = Passnager(secret_key=envs["secret_key"])
+
+    welcome_display = get_welcome_display()
+    display = get_display()
+
+    print(welcome_display)
 
     while True:
         try:
@@ -251,17 +260,17 @@ def main():
             case "3":
                 pm.delete_data()
             case "0":
-                clear_screen()
-                print(pyfiglet.figlet_format("seeyou",font='banner3-D'))
+                os.system(clear_screen())
+                print(get_ascii_art(text="seeyou"))
                 input("Press enter to continue")
-                clear_screen()
+                os.system(clear_screen())
                 sys.exit()
             case _:
                 print("Invalid Input!!!\n")
                 input("Press enter to continue")
                 continue
 
-        clear_screen()
+        os.system(clear_screen())
         print(display)
 
 if __name__ == "__main__":
